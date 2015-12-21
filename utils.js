@@ -357,10 +357,20 @@ var verifyDependency = function(recordarray, record) {
   },
 
   loadJSON = function(filelocation) {
-    if (require.cache) {
-      delete require.cache[require.resolve('../../' + filelocation)];
+    try{
+      if (require.cache) {
+        delete require.cache[require.resolve('../../' + filelocation)];
+       }
+      return require('../../' + filelocation);
+    }catch(e){
+      //backwards compatibility
+      if(e.code === 'MODULE_NOT_FOUND'){
+        if (require.cache) {
+          delete require.cache[require.resolve(filelocation)];
+        }
+        return require(filelocation);
+      }
     }
-    return require('../../' + filelocation);
   };
 exports.createRecordsInOrder = createRecordsInOrder
 exports.integratorRestClient = integratorRestClient
