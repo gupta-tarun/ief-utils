@@ -32,6 +32,10 @@ var createRecordsInOrder = function(recordarray, options, callback) {
         recordarray[temprecord].info = loadJSON(recordarray[temprecord].filelocation)
           //add bearer token in info node
         recordarray[temprecord].info.bearerToken = options.bearerToken;
+        //if it is already resolved directly load in response
+        if(recordarray[temprecord].resolved){
+          recordarray[temprecord].info.response = loadJSON(recordarray[temprecord].filelocation)
+        }
       }
     }
     //while every dependency is not resolved
@@ -165,7 +169,8 @@ var verifyDependency = function(recordarray, record) {
       //logInSplunk(JSON.stringify(temp))
       //if readfrom and writeto both are $ replace object with incoming data
       if (temp.readfrom === '$' && temp.writeto === '$') {
-        recordarray[record].info.data = recordarray[temp.record]['info']['response']
+        //deep copy
+        recordarray[record].info.data = JSON.parse(JSON.stringify(recordarray[temp.record]['info']['response']))
         continue
       }
       //read the value of temprecord
@@ -203,7 +208,12 @@ var verifyDependency = function(recordarray, record) {
             logInSplunk('Unable to find ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
             tempJsonPath.push('Undefined')
           }
-          tempvalue = tempvalue + tempJsonPath[0]
+          //Bug# in case of object do not add as string
+          if(!( typeof(tempJsonPath[0])==='object')){
+            tempvalue = tempvalue + tempJsonPath[0]
+          }else{
+            tempvalue = tempJsonPath[0]
+          }
         })
         //set in record
         //TODO: Add support for nested value writes
