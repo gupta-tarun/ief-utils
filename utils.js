@@ -9,7 +9,7 @@ var _ = require('lodash')
 
 var HERCULES_BASE_URL = 'https://api.integrator.io';
 if (process.env.NODE_ENV === 'staging') {
-  HERCULES_BASE_URL = 'http://api.staging.integrator.io'
+  HERCULES_BASE_URL = 'https://api.staging.integrator.io'
 } else if (process.env.NODE_ENV === 'development') {
   //local testing of code
   HERCULES_BASE_URL = 'http://api.localhost.io:5000'
@@ -87,7 +87,7 @@ var createRecordsInOrder = function(recordarray, options, callback) {
         opts.uri = opts.uri + '/distributed'
       }
     }
-    //logInSplunk('REST call : method|' + opts.method + ', uri|' + opts.uri);
+    logInSplunk('REST call : method|' + opts.method + ', uri|' + opts.uri);
     logInSplunk('REST call : json |' + JSON.stringify(opts.json));
     request(opts, function(error, res, body) {
       if (error) {
