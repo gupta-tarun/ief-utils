@@ -1,6 +1,6 @@
 {
   "name": "ief-utils",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Integrator Extension Framework Utilities",
   "main": "utils.js",
   "engines": {
