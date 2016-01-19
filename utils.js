@@ -33,7 +33,7 @@ var createRecordsInOrder = function(recordarray, options, callback) {
           //add bearer token in info node
         recordarray[temprecord].info.bearerToken = options.bearerToken;
         //if it is already resolved directly load in response
-        if(recordarray[temprecord].resolved){
+        if (recordarray[temprecord].resolved) {
           recordarray[temprecord].info.response = loadJSON(recordarray[temprecord].filelocation)
         }
       }
@@ -209,9 +209,9 @@ var verifyDependency = function(recordarray, record) {
             tempJsonPath.push('Undefined')
           }
           //Bug# in case of object do not add as string
-          if(!( typeof(tempJsonPath[0])==='object')){
+          if (!(typeof(tempJsonPath[0]) === 'object')) {
             tempvalue = tempvalue + tempJsonPath[0]
-          }else{
+          } else {
             tempvalue = tempJsonPath[0]
           }
         })
@@ -276,9 +276,15 @@ var verifyDependency = function(recordarray, record) {
     }
     return true;
   }
-  , logInSplunk = function(logmessage) {
+  , logInSplunk = function(logmessage, loglevel) {
+    //default level is debug
+    if (!loglevel && process.env.NODE_ENV === 'production') {
+      loglevel = 'debug'
+    } else if (!loglevel) {
+      loglevel = 'info'
+    }
     logstring = 'module="extensionUtils" message="';
-    logger.info(logstring + logmessage + '"');
+    logger.log(loglevel, logstring + logmessage + '"');
   }
   , verifyResponse = function(response) {
     if (response && response.statusCode && (response.statusCode >= 200 &&
@@ -367,14 +373,14 @@ var verifyDependency = function(recordarray, record) {
   },
 
   loadJSON = function(filelocation) {
-    try{
+    try {
       if (require.cache) {
         delete require.cache[require.resolve('../../' + filelocation)];
-       }
+      }
       return require('../../' + filelocation);
-    }catch(e){
+    } catch (e) {
       //backwards compatibility
-      if(e.code === 'MODULE_NOT_FOUND'){
+      if (e.code === 'MODULE_NOT_FOUND') {
         if (require.cache) {
           delete require.cache[require.resolve(filelocation)];
         }
