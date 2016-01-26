@@ -343,8 +343,6 @@ var verifyDependency = function(recordarray, record) {
           if (record.info.data && record.info.data._id) {
             record.info.id = record.info.data._id
             delete record.info.data
-          } else {
-            return cb(new Error('The method is set GET but there is no _id in data'));
           }
         }
         integratorRestClient(record.info, function(err, response, body) {
