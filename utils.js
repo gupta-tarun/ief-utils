@@ -15,7 +15,7 @@ if (process.env.NODE_ENV === 'staging') {
   HERCULES_BASE_URL = 'http://api.localhost.io:5000'
 }
 
-var createRecordsInOrder = function(recordarray, options, callback) {
+  var createRecordsInOrder = function(recordarray, options, callback) {
     //the record should Directed Acyclic Graph
     if (!verifyACircular(recordarray)) {
       return callback(new Error('The recordsArray has cyclic refreneces'));
@@ -136,15 +136,17 @@ var createRecordsInOrder = function(recordarray, options, callback) {
     });
   };
 
-var verifyDependency = function(recordarray, record) {
+  var verifyDependency = function(recordarray, record) {
     logInSplunk('start verifyDependency for ' + JSON.stringify(record));
     //get the dependency array and check if all are resolved in a loop
     var i;
+    // return true if there is no dependency for the input record
     if (!recordarray[record].dependson || recordarray[record].dependson.length === 0) {
       logInSplunk('verifyDependency : no depenedency')
       return true;
     }
     //logInSplunk('recordarray[record].dependson : ' + JSON.stringify(recordarray[record].dependson))
+    //return false if any dependency is not resolved for the input record
     for (i = 0; i < recordarray[record].dependson.length; i = i + 1) {
       if (!recordarray[record].dependson[i].resolved) {
         logInSplunk(record + ' still depend on ' + JSON.stringify(recordarray[record].dependson[i]))
@@ -170,6 +172,10 @@ var verifyDependency = function(recordarray, record) {
       //if readfrom and writeto both are $ replace object with incoming data
       if (temp.readfrom === '$' && temp.writeto === '$') {
         //deep copy
+        if (!temp.record || !recordarray[temp.record]['info'] || !recordarray[temp.record]['info']['response']) {
+          logInSplunk('Unable to resolve jsonpath for ' + temp, 'info')
+          throw new Error('Unable to find jsonpath ' + temp))
+        }
         recordarray[record].info.data = JSON.parse(JSON.stringify(recordarray[temp.record]['info']['response']))
         continue
       }
@@ -186,6 +192,7 @@ var verifyDependency = function(recordarray, record) {
         temp.readfrom = ta
       }
       //iterate over this array and create tempvalue
+      //tempReadValue
       var tempvalue = ""
       _.each(temp.readfrom, function(n) {
           //if there is no record use value directly
@@ -202,6 +209,13 @@ var verifyDependency = function(recordarray, record) {
               return
             }
           }
+          //TODO: handle parse
+          //settings.storemap[?(@.shopInstallComplete==false)]
+          //settings.storemap[?(@.{{var}})]
+          //state signature
+          //state.parseVariables = { “varName” : [ ] }
+          //varName should be a similar string as in given staring in handle parse.
+          handleParse(n.readfrom, recordarray['state'])
           tempJsonPath = jsonPath.eval(recordarray[n.record]['info']['response'], n.readfrom)
           logInSplunk('finding ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
           if (tempJsonPath.length <= 0) {
