@@ -7,7 +7,6 @@ var _ = require('lodash')
   , request = require('request')
   , logger = require('winston')
   , mustache = require('mustache');
-
 var HERCULES_BASE_URL = 'https://api.integrator.io';
 if (process.env.NODE_ENV === 'staging') {
   HERCULES_BASE_URL = 'https://api.staging.integrator.io'
@@ -18,8 +17,10 @@ if (process.env.NODE_ENV === 'staging') {
 
   var createRecordsInOrder = function(recordarray, options, callback) {
     //the record should Directed Acyclic Graph
-    if(!!recordarray['state'] && recordarray['state'].connectorEdition){
-      trimNodesBasedOnEdition(recordarray, recordarray['state'].connectorEdition)
+    if(!!recordarray['state'] && recordarray['state']['info'] && recordarray['state']['info']['response']
+       && !!recordarray['state']['info']['response'].connectorEdition){
+      //TODO: add a function to validate edition of nodes to be compatible with editions of dependent nodes
+      trimNodesBasedOnEdition(recordarray, recordarray['state']['info']['response'].connectorEdition)
     }
     if (!verifyACircular(recordarray)) {
       return callback(new Error('The recordsArray has cyclic refreneces'));
