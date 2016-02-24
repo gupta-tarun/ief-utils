@@ -26,7 +26,8 @@
     "async": "1.4.2",
     "JSONPath": "0.10.0",
     "request": "2.38.0",
-    "winston": "0.7.3"
+    "winston": "0.7.3",
+    "mustache": "2.2.1"
   },
   "gitHead": "ce87f488885ddd5b978d9fbc7134305c7e3e9564",
   "bugs": {

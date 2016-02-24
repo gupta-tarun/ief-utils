@@ -5,8 +5,9 @@ var _ = require('lodash')
   , async = require('async')
   , jsonPath = require('JSONPath')
   , request = require('request')
-  , logger = require('winston');
-
+  , logger = require('winston')
+  , mustache = require('mustache');
+logger.level = 'error'
 var HERCULES_BASE_URL = 'https://api.integrator.io';
 if (process.env.NODE_ENV === 'staging') {
   HERCULES_BASE_URL = 'https://api.staging.integrator.io'
@@ -17,6 +18,9 @@ if (process.env.NODE_ENV === 'staging') {
 
   var createRecordsInOrder = function(recordarray, options, callback) {
     //the record should Directed Acyclic Graph
+    if(!!recordarray['state'] && recordarray['state'].connectorEdition){
+      trimNodesBasedOnEdition(recordarray, recordarray['state'].connectorEdition)
+    }
     if (!verifyACircular(recordarray)) {
       return callback(new Error('The recordsArray has cyclic refreneces'));
     };
@@ -140,15 +144,21 @@ if (process.env.NODE_ENV === 'staging') {
     logInSplunk('start verifyDependency for ' + JSON.stringify(record));
     //get the dependency array and check if all are resolved in a loop
     var i;
+    if(recordarray[record].dependencyVerified){
+      logInSplunk('verifyDependency : dependency has been verified for ' + record)
+      return true;
+    }
     // return true if there is no dependency for the input record
     if (!recordarray[record].dependson || recordarray[record].dependson.length === 0) {
       logInSplunk('verifyDependency : no depenedency')
+      recordarray[record].dependencyVerified = true
       return true;
     }
     //logInSplunk('recordarray[record].dependson : ' + JSON.stringify(recordarray[record].dependson))
     //return false if any dependency is not resolved for the input record
     for (i = 0; i < recordarray[record].dependson.length; i = i + 1) {
-      if (!recordarray[record].dependson[i].resolved) {
+      if (!!recordarray[record].dependson[i] && (!recordarray[record].dependson[i].resolved
+            || !recordarray[record].dependson[i].dependencyVerified)) {
         logInSplunk(record + ' still depend on ' + JSON.stringify(recordarray[record].dependson[i]))
         return false;
       }
@@ -168,13 +178,18 @@ if (process.env.NODE_ENV === 'staging') {
     //       }
     for (i = 0; i < recordarray[record].info.jsonpath.length; i = i + 1) {
       var temp = recordarray[record].info.jsonpath[i];
+      //continue without resolving dependency if dependent record does not exist in meta file
+      if(!!temp.record && !recordarray[temp.record]){
+        console.log("record node does not exist in meta file:", recordarray[record].info.jsonpath[i].record)
+        continue
+      }
       //logInSplunk(JSON.stringify(temp))
       //if readfrom and writeto both are $ replace object with incoming data
       if (temp.readfrom === '$' && temp.writeto === '$') {
         //deep copy
         if (!temp.record || !recordarray[temp.record]['info'] || !recordarray[temp.record]['info']['response']) {
           logInSplunk('Unable to resolve jsonpath for ' + temp, 'info')
-          throw new Error('Unable to find jsonpath ' + temp))
+          throw new Error('Unable to find jsonpath ' + temp)
         }
         recordarray[record].info.data = JSON.parse(JSON.stringify(recordarray[temp.record]['info']['response']))
         continue
@@ -209,13 +224,14 @@ if (process.env.NODE_ENV === 'staging') {
               return
             }
           }
-          //TODO: handle parse
-          //settings.storemap[?(@.shopInstallComplete==false)]
-          //settings.storemap[?(@.{{var}})]
-          //state signature
-          //state.parseVariables = { “varName” : [ ] }
-          //varName should be a similar string as in given staring in handle parse.
-          handleParse(n.readfrom, recordarray['state'])
+          if (n.readfrom === '$') {
+            //deep copy
+            tempvalue = JSON.parse(JSON.stringify(recordarray[n.record].info.data))
+            return
+          }
+          if(!!recordarray['state'] && !!recordarray['state'].barVariables){
+            n.readfrom = mustache.render(n.readfrom, recordarray['state'].barVariables)
+          }
           tempJsonPath = jsonPath.eval(recordarray[n.record]['info']['response'], n.readfrom)
           logInSplunk('finding ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
           if (tempJsonPath.length <= 0) {
@@ -234,6 +250,11 @@ if (process.env.NODE_ENV === 'staging') {
         //if it doesn't start with $ mean no need to run JSONPath eval on writeto
       var tempWriteto;
       if (temp.writetopath) {
+        //adding support for dynamic write to path
+        if(!!recordarray['state'] && !!recordarray['state'].barVariables){
+          temp.writetopath = mustache.render(temp.writetopath, recordarray['state'].barVariables)
+        }
+
         tempWriteto = jsonPath.eval(recordarray[record].info.data, temp.writetopath);
         if (tempWriteto.length <= 0) {
           logInSplunk('Unable to find jsonpath ' + temp.writetopath + ' in ' + JSON.stringify(recordarray[record].info.data))
@@ -260,6 +281,8 @@ if (process.env.NODE_ENV === 'staging') {
       logInSplunk('setting ' + temp.writeto + ' as ' + tempWriteto[temp.writeto]);
     }
     //logInSplunk('After dependecy resolution record : ' + JSON.stringify(recordarray[record].info.data) );
+    //mark dependecy veriified and return true
+    recordarray[record].dependencyVerified = true
     return true;
   }
   , verifyACircular = function(graph) {
@@ -319,8 +342,8 @@ if (process.env.NODE_ENV === 'staging') {
 
     for (tempnode in recordarray) {
       try {
-        if (!recordarray[tempnode].resolved && verifyDependency(recordarray, tempnode)) {
-          batch.push(recordarray[tempnode]);
+        if(verifyDependency(recordarray, tempnode) && !recordarray[tempnode].resolved){
+            batch.push(recordarray[tempnode]);
         }
       } catch (e) {
         //we need to push that error message in callback
@@ -382,9 +405,39 @@ if (process.env.NODE_ENV === 'staging') {
       //logInSplunk('calling async');
       makeAsyncCalls(recordarray, callback);
     })
-  },
-
-  loadJSON = function(filelocation) {
+  }
+  , trimNodesBasedOnEdition = function(recordarray, connectorEdition){
+    var temprecord;
+    //trim nodes in upgrade mode
+    if(recordarray['state'].upgradeMode){
+      var prevEdition = recordarray['state'].prevEdition
+      for(temprecord in recordarray) {
+        //remove the node which is not compatible with provided edition
+        if(_.isArray(recordarray[temprecord].edition) && _.contains(recordarray[temprecord].edition, connectorEdition)
+          && !_.contains(recordarray[temprecord].edition, prevEdition) && !_.contains(recordarray[temprecord].edition, "all")
+        || recordarray[temprecord].upgradeMode){
+          console.log("including node", temprecord)
+          continue
+        }
+        else {
+          delete recordarray[temprecord]
+        }
+      }
+    }
+    //trim nodes in installation mode
+    else {
+      for(temprecord in recordarray) {
+        //remove the node which is not compatible with provided edition
+        if(_.isArray(recordarray[temprecord].edition) && !_.contains(recordarray[temprecord].edition, connectorEdition)
+            && !_.contains(recordarray[temprecord].edition, "all")){
+              console.log("deleting node", temprecord)
+          delete recordarray[temprecord]
+        }
+      }
+    }
+  }
+  //TODO: revert back to load file
+  , loadJSON = function(filelocation) {
     try {
       if (require.cache) {
         delete require.cache[require.resolve('../../' + filelocation)];
