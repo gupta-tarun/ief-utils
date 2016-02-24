@@ -7,7 +7,7 @@ var _ = require('lodash')
   , request = require('request')
   , logger = require('winston')
   , mustache = require('mustache');
-logger.level = 'error'
+
 var HERCULES_BASE_URL = 'https://api.integrator.io';
 if (process.env.NODE_ENV === 'staging') {
   HERCULES_BASE_URL = 'https://api.staging.integrator.io'
