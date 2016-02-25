@@ -7,6 +7,7 @@ var _ = require('lodash')
   , request = require('request')
   , logger = require('winston')
   , mustache = require('mustache');
+  //logger.level = 'error'
 var HERCULES_BASE_URL = 'https://api.integrator.io';
 if (process.env.NODE_ENV === 'staging') {
   HERCULES_BASE_URL = 'https://api.staging.integrator.io'
@@ -17,10 +18,9 @@ if (process.env.NODE_ENV === 'staging') {
 
   var createRecordsInOrder = function(recordarray, options, callback) {
     //the record should Directed Acyclic Graph
-    if(!!recordarray['state'] && recordarray['state']['info'] && recordarray['state']['info']['response']
-       && !!recordarray['state']['info']['response'].connectorEdition){
+    if(!!options.upgradeMode || !!options.connectorEdition){
       //TODO: add a function to validate edition of nodes to be compatible with editions of dependent nodes
-      trimNodesBasedOnEdition(recordarray, recordarray['state']['info']['response'].connectorEdition)
+      trimNodesBasedOnEdition(recordarray, options)
     }
     if (!verifyACircular(recordarray)) {
       return callback(new Error('The recordsArray has cyclic refreneces'));
@@ -99,6 +99,7 @@ if (process.env.NODE_ENV === 'staging') {
         return callback(new Error('Error while connecting to Integrator.io'));
       }
       if (!verifyResponse(res)) {
+        console.log("api error", opts)
         return callback(new Error('Unable to verify response'));
       }
       //this means success
@@ -134,6 +135,7 @@ if (process.env.NODE_ENV === 'staging') {
         return callback(new Error('Error while connecting to Integrator.io'));
       }
       if (!verifyResponse(res)) {
+        console.log("api error", opts)
         return callback(new Error('Unable to verify response'));
       }
       //this means success
@@ -141,17 +143,17 @@ if (process.env.NODE_ENV === 'staging') {
     });
   };
 
-  var verifyDependency = function(recordarray, record) {
-    logInSplunk('start verifyDependency for ' + JSON.stringify(record));
+  var verifyAndInjectDependency = function(recordarray, record) {
+    logInSplunk('start verifyAndInjectDependency for ' + JSON.stringify(record));
     //get the dependency array and check if all are resolved in a loop
     var i;
     if(recordarray[record].dependencyVerified){
-      logInSplunk('verifyDependency : dependency has been verified for ' + record)
+      logInSplunk('verifyAndInjectDependency : dependency has been verified for ' + record)
       return true;
     }
     // return true if there is no dependency for the input record
     if (!recordarray[record].dependson || recordarray[record].dependson.length === 0) {
-      logInSplunk('verifyDependency : no depenedency')
+      logInSplunk('verifyAndInjectDependency : no depenedency')
       recordarray[record].dependencyVerified = true
       return true;
     }
@@ -181,7 +183,7 @@ if (process.env.NODE_ENV === 'staging') {
       var temp = recordarray[record].info.jsonpath[i];
       //continue without resolving dependency if dependent record does not exist in meta file
       if(!!temp.record && !recordarray[temp.record]){
-        console.log("record node does not exist in meta file:", recordarray[record].info.jsonpath[i].record)
+        //console.log("record node does not exist in meta file:", recordarray[record].info.jsonpath[i].record)
         continue
       }
       //logInSplunk(JSON.stringify(temp))
@@ -233,9 +235,11 @@ if (process.env.NODE_ENV === 'staging') {
           if(!!recordarray['state'] && !!recordarray['state'].barVariables){
             n.readfrom = mustache.render(n.readfrom, recordarray['state'].barVariables)
           }
+          //console.log("n.record", n.record)
           tempJsonPath = jsonPath.eval(recordarray[n.record]['info']['response'], n.readfrom)
           logInSplunk('finding ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
           if (tempJsonPath.length <= 0) {
+            console.log('Unable to find ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
             logInSplunk('Unable to find ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
             tempJsonPath.push('Undefined')
           }
@@ -343,7 +347,7 @@ if (process.env.NODE_ENV === 'staging') {
 
     for (tempnode in recordarray) {
       try {
-        if(verifyDependency(recordarray, tempnode) && !recordarray[tempnode].resolved){
+        if(verifyAndInjectDependency(recordarray, tempnode) && !recordarray[tempnode].resolved){
             batch.push(recordarray[tempnode]);
         }
       } catch (e) {
@@ -353,7 +357,7 @@ if (process.env.NODE_ENV === 'staging') {
     }
     //logInSplunk('batch : ' + JSON.stringify(batch))
     //we have all non dependent record perform aysn calls here
-    async.each(batch, function(record, cb) {
+    async.eachSeries(batch, function(record, cb) {
       //we got record meta, try loading the record
       //logInSplunk('record.info :'+ JSON.stringify(record.info));
       if (record.info.apiIdentifier) {
@@ -407,17 +411,23 @@ if (process.env.NODE_ENV === 'staging') {
       makeAsyncCalls(recordarray, callback);
     })
   }
-  , trimNodesBasedOnEdition = function(recordarray, connectorEdition){
+  , trimNodesBasedOnEdition = function(recordarray, options){
     var temprecord;
     //trim nodes in upgrade mode
-    if(recordarray['state'].upgradeMode){
-      var prevEdition = recordarray['state'].prevEdition
+    if(options.upgradeMode){
+      if(!options.currentEdition || !options.upgradeEdition){
+        logInSplunk('Config Error: missing edition info to upgrade');
+        return callback(new Error(
+          'Config Error: missing edition info to upgrade'));
+      }
+      var currentEdition = options.currentEdition
+      , upgradeEdition = options.upgradeEdition
       for(temprecord in recordarray) {
-        //remove the node which is not compatible with provided edition
-        if(_.isArray(recordarray[temprecord].edition) && _.contains(recordarray[temprecord].edition, connectorEdition)
-          && !_.contains(recordarray[temprecord].edition, prevEdition) && !_.contains(recordarray[temprecord].edition, "all")
-        || recordarray[temprecord].upgradeMode){
-          console.log("including node", temprecord)
+        //remove the node which is not eligible for provided edition
+        if(_.isArray(recordarray[temprecord].edition) && _.contains(recordarray[temprecord].edition, upgradeEdition)
+          && !_.contains(recordarray[temprecord].edition, currentEdition) && !_.contains(recordarray[temprecord].edition, "all")
+          || recordarray[temprecord].upgradeMode){
+          //console.log("including node", temprecord)
           continue
         }
         else {
@@ -427,11 +437,12 @@ if (process.env.NODE_ENV === 'staging') {
     }
     //trim nodes in installation mode
     else {
+      var connectorEdition = options.connectorEdition
       for(temprecord in recordarray) {
-        //remove the node which is not compatible with provided edition
+        //remove the node which is not eligible for provided edition
         if(_.isArray(recordarray[temprecord].edition) && !_.contains(recordarray[temprecord].edition, connectorEdition)
             && !_.contains(recordarray[temprecord].edition, "all")){
-              console.log("deleting node", temprecord)
+              //console.log("deleting node", temprecord)
           delete recordarray[temprecord]
         }
       }
@@ -441,9 +452,9 @@ if (process.env.NODE_ENV === 'staging') {
   , loadJSON = function(filelocation) {
     try {
       if (require.cache) {
-        delete require.cache[require.resolve('../../' + filelocation)];
+        delete require.cache[require.resolve('../shopify-netsuite-connector/' + filelocation)];
       }
-      return require('../../' + filelocation);
+      return require('../shopify-netsuite-connector/' + filelocation);
     } catch (e) {
       //backwards compatibility
       if (e.code === 'MODULE_NOT_FOUND') {
