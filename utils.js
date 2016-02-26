@@ -357,7 +357,7 @@ if (process.env.NODE_ENV === 'staging') {
     }
     //logInSplunk('batch : ' + JSON.stringify(batch))
     //we have all non dependent record perform aysn calls here
-    async.eachSeries(batch, function(record, cb) {
+    async.each(batch, function(record, cb) {
       //we got record meta, try loading the record
       //logInSplunk('record.info :'+ JSON.stringify(record.info));
       if (record.info.apiIdentifier) {
@@ -426,7 +426,7 @@ if (process.env.NODE_ENV === 'staging') {
         //remove the node which is not eligible for provided edition
         if(_.isArray(recordarray[temprecord].edition) && _.contains(recordarray[temprecord].edition, upgradeEdition)
           && !_.contains(recordarray[temprecord].edition, currentEdition) && !_.contains(recordarray[temprecord].edition, "all")
-          || recordarray[temprecord].upgradeMode){
+          || !!recordarray[temprecord].includeToUpgrade){
           //console.log("including node", temprecord)
           continue
         }
@@ -452,9 +452,9 @@ if (process.env.NODE_ENV === 'staging') {
   , loadJSON = function(filelocation) {
     try {
       if (require.cache) {
-        delete require.cache[require.resolve('../shopify-netsuite-connector/' + filelocation)];
+        delete require.cache[require.resolve('../../' + filelocation)];
       }
-      return require('../shopify-netsuite-connector/' + filelocation);
+      return require('../../' + filelocation);
     } catch (e) {
       //backwards compatibility
       if (e.code === 'MODULE_NOT_FOUND') {
