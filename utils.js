@@ -6,7 +6,7 @@ var _ = require('lodash')
   , jsonPath = require('JSONPath')
   , request = require('request')
   , logger = require('winston')
-  , mustache = require('mustache');
+  , handlebars = require('handlebars');
   //logger.level = 'error'
 var HERCULES_BASE_URL = 'https://api.integrator.io';
 if (process.env.NODE_ENV === 'staging') {
@@ -99,7 +99,6 @@ if (process.env.NODE_ENV === 'staging') {
         return callback(new Error('Error while connecting to Integrator.io'));
       }
       if (!verifyResponse(res)) {
-        console.log("api error", opts)
         return callback(new Error('Unable to verify response'));
       }
       //this means success
@@ -135,7 +134,6 @@ if (process.env.NODE_ENV === 'staging') {
         return callback(new Error('Error while connecting to Integrator.io'));
       }
       if (!verifyResponse(res)) {
-        console.log("api error", opts)
         return callback(new Error('Unable to verify response'));
       }
       //this means success
@@ -232,14 +230,11 @@ if (process.env.NODE_ENV === 'staging') {
             tempvalue = JSON.parse(JSON.stringify(recordarray[n.record].info.data))
             return
           }
-          if(!!recordarray['state'] && !!recordarray['state'].barVariables){
-            n.readfrom = mustache.render(n.readfrom, recordarray['state'].barVariables)
-          }
-          //console.log("n.record", n.record)
+          //handles bars if exists any.
+          n.readfrom = evalHandleBar(n.readfrom, recordarray)
           tempJsonPath = jsonPath.eval(recordarray[n.record]['info']['response'], n.readfrom)
           logInSplunk('finding ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
           if (tempJsonPath.length <= 0) {
-            console.log('Unable to find ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
             logInSplunk('Unable to find ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
             tempJsonPath.push('Undefined')
           }
@@ -256,10 +251,7 @@ if (process.env.NODE_ENV === 'staging') {
       var tempWriteto;
       if (temp.writetopath) {
         //adding support for dynamic write to path
-        if(!!recordarray['state'] && !!recordarray['state'].barVariables){
-          temp.writetopath = mustache.render(temp.writetopath, recordarray['state'].barVariables)
-        }
-
+        temp.writetopath = evalHandleBar(temp.writetopath, recordarray)
         tempWriteto = jsonPath.eval(recordarray[record].info.data, temp.writetopath);
         if (tempWriteto.length <= 0) {
           logInSplunk('Unable to find jsonpath ' + temp.writetopath + ' in ' + JSON.stringify(recordarray[record].info.data))
@@ -427,7 +419,7 @@ if (process.env.NODE_ENV === 'staging') {
         if(_.isArray(recordarray[temprecord].edition) && _.contains(recordarray[temprecord].edition, upgradeEdition)
           && !_.contains(recordarray[temprecord].edition, currentEdition) && !_.contains(recordarray[temprecord].edition, "all")
           || !!recordarray[temprecord].includeToUpgrade){
-          //console.log("including node", temprecord)
+          logInSplunk("including node " + temprecord, 'info')
           continue
         }
         else {
@@ -447,6 +439,33 @@ if (process.env.NODE_ENV === 'staging') {
         }
       }
     }
+  }
+  /*
+    Path should start with node name holding the bar data if bar data is provided through helper.
+  */
+  , evalHandleBar = function(sourceStr, recordarray){
+    var temp = handlebars.compile(sourceStr)
+    , barData = {} // dummy object
+    handlebars.registerHelper('barPath', function(path) {
+      var pathElement = path.split('.')
+      , returnValue = null
+      //console.log(pathElement)
+      if(pathElement.length > 0){
+        returnValue = recordarray
+      }
+      _.each(pathElement, function(element){
+        if(!returnValue[element]){
+
+          throw new Error('Cannot find the bar value for the path: ' + path)
+        }
+        returnValue = returnValue[element]
+      })
+      if(!returnValue){
+        throw new Error('bar path is not in required format: ' + path)
+      }
+      return returnValue;
+    })
+    return temp(barData)
   }
   //TODO: revert back to load file
   , loadJSON = function(filelocation) {
