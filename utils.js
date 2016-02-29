@@ -446,16 +446,16 @@ if (process.env.NODE_ENV === 'staging') {
   , evalHandleBar = function(sourceStr, recordarray){
     var temp = handlebars.compile(sourceStr)
     , barData = {} // dummy object
-    handlebars.registerHelper('barPath', function(path) {
+    handlebars.registerHelper('pathHelper', function(path) {
       var pathElement = path.split('.')
       , returnValue = null
-      //console.log(pathElement)
-      if(pathElement.length > 0){
-        returnValue = recordarray
+      if(pathElement.length <= 0){
+        return temp(barData)
       }
+      returnValue = recordarray[pathElement[0]]['info']['response']
+      pathElement.splice(0,1)
       _.each(pathElement, function(element){
         if(!returnValue[element]){
-
           throw new Error('Cannot find the bar value for the path: ' + path)
         }
         returnValue = returnValue[element]
