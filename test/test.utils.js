@@ -356,4 +356,69 @@ describe('VerifyDependency Function', function() {
       done();
     })
   })
+  it('Should inlude node for premiun edition only', function(done){
+    var stubstoload = [
+      'verifyDependency/utils-mock-connection-netsuite.json',
+      'verifyDependency/utils-exportData-readFromObject.json'
+    ]
+    createStubResponses(stub, stubstoload)
+    var records = require('./data/verifyDependency/utils-recordMeta-edition.json');
+    var data = {}
+    data.connectorEdition = "premium"
+    initializeData(records, data)
+    utils.createRecordsInOrder(records, data, function(error, success){
+      if(error){
+        logger.debug('Test failed : ' + JSON.stringify(error));
+      }
+      assert.deepEqual(!!success['export-fulfillment'] && !success['connection-netsuite'], true,
+       'should include premium nodes')
+      done();
+    })
+  })
+  it('Should include only preium node in upgradeMode', function(done){
+    var stubstoload = [
+      'verifyDependency/utils-mock-connection-netsuite.json',
+      'verifyDependency/utils-exportData-readFromObject.json'
+    ]
+    createStubResponses(stub, stubstoload)
+    var records = require('./data/verifyDependency/utils-recordMeta-edition.json');
+    var data = {}
+    data.upgradeMode = true
+    data.currentEdition = "standard"
+    data.upgradeEdition = "premium"
+    initializeData(records, data)
+    utils.createRecordsInOrder(records, data, function(error, success){
+      if(error){
+        logger.debug('Test failed : ' + JSON.stringify(error));
+      }
+      assert.deepEqual(!!success['export-fulfillment'] && !success['connection-netsuite'], true,
+       'should include premium nodes only')
+      done();
+    })
+  })
+  it('Should handle bar by calling evalHandleBar method', function(done){
+    var stubstoload = [
+      'verifyDependency/utils-mock-connection-netsuite.json',
+      'verifyDependency/utils-exportData-readFromObject_withHandleBar.json'
+    ]
+    createStubResponses(stub, stubstoload)
+    var records = require('./data/verifyDependency/utils-recordMeta-barHandler.json');
+    var data = {}
+    , state = {
+      storeIdentifyAttr : "test"
+      , storeIdentifyValue : true
+      , resolved : true
+      , isLoaded : true
+    }
+    initializeData(records, data)
+    records.state = state
+    utils.createRecordsInOrder(records, data, function(error, success){
+      if(error){
+        logger.debug('Test failed : ' + JSON.stringify(error));
+      }
+      assert.deepEqual(!!success['export-fulfillment'].info.data.writeHere[0]._connectionId, true,
+       'bar handler should be performed correctly')
+      done();
+    })
+  })
 })
