@@ -18,7 +18,7 @@ if (process.env.NODE_ENV === 'staging') {
 
   var createRecordsInOrder = function(recordarray, options, callback) {
     //the record should Directed Acyclic Graph
-    if(!!options.upgradeMode || !!options.connectorEdition){
+    if(!!options && (!!options.upgradeMode || !!options.connectorEdition)){
       //TODO: add a function to validate edition of nodes to be compatible with editions of dependent nodes
       trimNodesBasedOnEdition(recordarray, options)
     }
