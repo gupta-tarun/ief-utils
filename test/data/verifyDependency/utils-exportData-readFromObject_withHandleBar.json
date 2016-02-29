@@ -16,7 +16,7 @@
         "id": 1345678
       },
       "writeto": "_connectionId",
-      "writetopath": "$.writeHere[?(@.{{{barPath 'state.storeIdentifyAttr'}}}=={{{barPath 'state.storeIdentifyValue'}}})]"
+      "writetopath": "$.writeHere[?(@.{{{pathHelper 'state.storeIdentifyAttr'}}}=={{{pathHelper 'state.storeIdentifyValue'}}})]"
       ,"convertToString": true
     }
   ],

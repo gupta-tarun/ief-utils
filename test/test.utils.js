@@ -405,13 +405,16 @@ describe('VerifyDependency Function', function() {
     var records = require('./data/verifyDependency/utils-recordMeta-barHandler.json');
     var data = {}
     , state = {
-      storeIdentifyAttr : "test"
-      , storeIdentifyValue : true
-      , resolved : true
+      resolved : true
       , isLoaded : true
     }
     initializeData(records, data)
     records.state = state
+    records.state.info = {}
+    records.state.info.response = {
+      storeIdentifyAttr : "test"
+      , storeIdentifyValue : true
+    }
     utils.createRecordsInOrder(records, data, function(error, success){
       if(error){
         logger.debug('Test failed : ' + JSON.stringify(error));
