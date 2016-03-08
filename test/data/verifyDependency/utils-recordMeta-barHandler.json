@@ -1,0 +1,13 @@
+{
+  "connection-netsuite": {
+    "edition": ["enterprise"],
+    "dependson": [],
+    "filelocation": "./data/common/utils-connection-netsuite.json"
+  },
+  "export-fulfillment": {
+    "name": "shopify-netsuite-fulfillment-export-adaptor",
+    "edition": ["premium"],
+    "dependson": ["connection-netsuite", "state"],
+    "filelocation": "./data/verifyDependency/utils-exportData-readFromObject_withHandleBar.json"
+  }
+}

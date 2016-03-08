@@ -5,8 +5,9 @@ var _ = require('lodash')
   , async = require('async')
   , jsonPath = require('JSONPath')
   , request = require('request')
-  , logger = require('winston');
-
+  , logger = require('winston')
+  , handlebars = require('handlebars');
+  //logger.level = 'error'
 var HERCULES_BASE_URL = 'https://api.integrator.io';
 if (process.env.NODE_ENV === 'staging') {
   HERCULES_BASE_URL = 'https://api.staging.integrator.io'
@@ -15,8 +16,12 @@ if (process.env.NODE_ENV === 'staging') {
   HERCULES_BASE_URL = 'http://api.localhost.io:5000'
 }
 
-var createRecordsInOrder = function(recordarray, options, callback) {
+  var createRecordsInOrder = function(recordarray, options, callback) {
     //the record should Directed Acyclic Graph
+    if(!!options && (!!options.upgradeMode || !!options.connectorEdition)){
+      //TODO: add a function to validate edition of nodes to be compatible with editions of dependent nodes
+      trimNodesBasedOnEdition(recordarray, options)
+    }
     if (!verifyACircular(recordarray)) {
       return callback(new Error('The recordsArray has cyclic refreneces'));
     };
@@ -136,17 +141,25 @@ var createRecordsInOrder = function(recordarray, options, callback) {
     });
   };
 
-var verifyDependency = function(recordarray, record) {
-    logInSplunk('start verifyDependency for ' + JSON.stringify(record));
+  var verifyAndInjectDependency = function(recordarray, record) {
+    logInSplunk('start verifyAndInjectDependency for ' + JSON.stringify(record));
     //get the dependency array and check if all are resolved in a loop
     var i;
+    if(recordarray[record].dependencyVerified){
+      logInSplunk('verifyAndInjectDependency : dependency has been verified for ' + record)
+      return true;
+    }
+    // return true if there is no dependency for the input record
     if (!recordarray[record].dependson || recordarray[record].dependson.length === 0) {
-      logInSplunk('verifyDependency : no depenedency')
+      logInSplunk('verifyAndInjectDependency : no depenedency')
+      recordarray[record].dependencyVerified = true
       return true;
     }
     //logInSplunk('recordarray[record].dependson : ' + JSON.stringify(recordarray[record].dependson))
+    //return false if any dependency is not resolved for the input record
     for (i = 0; i < recordarray[record].dependson.length; i = i + 1) {
-      if (!recordarray[record].dependson[i].resolved) {
+      if (!!recordarray[record].dependson[i] && (!recordarray[record].dependson[i].resolved
+            || !recordarray[record].dependson[i].dependencyVerified)) {
         logInSplunk(record + ' still depend on ' + JSON.stringify(recordarray[record].dependson[i]))
         return false;
       }
@@ -166,10 +179,19 @@ var verifyDependency = function(recordarray, record) {
     //       }
     for (i = 0; i < recordarray[record].info.jsonpath.length; i = i + 1) {
       var temp = recordarray[record].info.jsonpath[i];
+      //continue without resolving dependency if dependent record does not exist in meta file
+      if(!!temp.record && !recordarray[temp.record]){
+        //console.log("record node does not exist in meta file:", recordarray[record].info.jsonpath[i].record)
+        continue
+      }
       //logInSplunk(JSON.stringify(temp))
       //if readfrom and writeto both are $ replace object with incoming data
       if (temp.readfrom === '$' && temp.writeto === '$') {
         //deep copy
+        if (!temp.record || !recordarray[temp.record]['info'] || !recordarray[temp.record]['info']['response']) {
+          logInSplunk('Unable to resolve jsonpath for ' + temp, 'info')
+          throw new Error('Unable to find jsonpath ' + temp)
+        }
         recordarray[record].info.data = JSON.parse(JSON.stringify(recordarray[temp.record]['info']['response']))
         continue
       }
@@ -186,6 +208,7 @@ var verifyDependency = function(recordarray, record) {
         temp.readfrom = ta
       }
       //iterate over this array and create tempvalue
+      //tempReadValue
       var tempvalue = ""
       _.each(temp.readfrom, function(n) {
           //if there is no record use value directly
@@ -202,6 +225,13 @@ var verifyDependency = function(recordarray, record) {
               return
             }
           }
+          if (n.readfrom === '$') {
+            //deep copy
+            tempvalue = JSON.parse(JSON.stringify(recordarray[n.record].info.data))
+            return
+          }
+          //handles bars if exists any.
+          n.readfrom = evalHandleBar(n.readfrom, recordarray)
           tempJsonPath = jsonPath.eval(recordarray[n.record]['info']['response'], n.readfrom)
           logInSplunk('finding ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
           if (tempJsonPath.length <= 0) {
@@ -220,6 +250,8 @@ var verifyDependency = function(recordarray, record) {
         //if it doesn't start with $ mean no need to run JSONPath eval on writeto
       var tempWriteto;
       if (temp.writetopath) {
+        //adding support for dynamic write to path
+        temp.writetopath = evalHandleBar(temp.writetopath, recordarray)
         tempWriteto = jsonPath.eval(recordarray[record].info.data, temp.writetopath);
         if (tempWriteto.length <= 0) {
           logInSplunk('Unable to find jsonpath ' + temp.writetopath + ' in ' + JSON.stringify(recordarray[record].info.data))
@@ -246,6 +278,8 @@ var verifyDependency = function(recordarray, record) {
       logInSplunk('setting ' + temp.writeto + ' as ' + tempWriteto[temp.writeto]);
     }
     //logInSplunk('After dependecy resolution record : ' + JSON.stringify(recordarray[record].info.data) );
+    //mark dependecy veriified and return true
+    recordarray[record].dependencyVerified = true
     return true;
   }
   , verifyACircular = function(graph) {
@@ -305,8 +339,8 @@ var verifyDependency = function(recordarray, record) {
 
     for (tempnode in recordarray) {
       try {
-        if (!recordarray[tempnode].resolved && verifyDependency(recordarray, tempnode)) {
-          batch.push(recordarray[tempnode]);
+        if(verifyAndInjectDependency(recordarray, tempnode) && !recordarray[tempnode].resolved){
+            batch.push(recordarray[tempnode]);
         }
       } catch (e) {
         //we need to push that error message in callback
@@ -368,9 +402,73 @@ var verifyDependency = function(recordarray, record) {
       //logInSplunk('calling async');
       makeAsyncCalls(recordarray, callback);
     })
-  },
-
-  loadJSON = function(filelocation) {
+  }
+  , trimNodesBasedOnEdition = function(recordarray, options){
+    var temprecord;
+    //trim nodes in upgrade mode
+    if(options.upgradeMode){
+      if(!options.currentEdition || !options.upgradeEdition){
+        logInSplunk('Config Error: missing edition info to upgrade');
+        return callback(new Error(
+          'Config Error: missing edition info to upgrade'));
+      }
+      var currentEdition = options.currentEdition
+      , upgradeEdition = options.upgradeEdition
+      for(temprecord in recordarray) {
+        //remove the node which is not eligible for provided edition
+        if(_.isArray(recordarray[temprecord].edition) && _.contains(recordarray[temprecord].edition, upgradeEdition)
+          && !_.contains(recordarray[temprecord].edition, currentEdition) && !_.contains(recordarray[temprecord].edition, "all")
+          || !!recordarray[temprecord].includeToUpgrade){
+          logInSplunk("including node " + temprecord, 'info')
+          continue
+        }
+        else {
+          delete recordarray[temprecord]
+        }
+      }
+    }
+    //trim nodes in installation mode
+    else {
+      var connectorEdition = options.connectorEdition
+      for(temprecord in recordarray) {
+        //remove the node which is not eligible for provided edition
+        if(_.isArray(recordarray[temprecord].edition) && !_.contains(recordarray[temprecord].edition, connectorEdition)
+            && !_.contains(recordarray[temprecord].edition, "all")){
+              //console.log("deleting node", temprecord)
+          delete recordarray[temprecord]
+        }
+      }
+    }
+  }
+  /*
+    Path should start with node name holding the bar data if bar data is provided through helper.
+  */
+  , evalHandleBar = function(sourceStr, recordarray){
+    var temp = handlebars.compile(sourceStr)
+    , barData = {} // dummy object
+    handlebars.registerHelper('pathHelper', function(path) {
+      var pathElement = path.split('.')
+      , returnValue = null
+      if(pathElement.length <= 0){
+        return temp(barData)
+      }
+      returnValue = recordarray[pathElement[0]]['info']['response']
+      pathElement.splice(0,1)
+      _.each(pathElement, function(element){
+        if(!returnValue[element]){
+          throw new Error('Cannot find the bar value for the path: ' + path)
+        }
+        returnValue = returnValue[element]
+      })
+      if(!returnValue){
+        throw new Error('bar path is not in required format: ' + path)
+      }
+      return returnValue;
+    })
+    return temp(barData)
+  }
+  //TODO: revert back to load file
+  , loadJSON = function(filelocation) {
     try {
       if (require.cache) {
         delete require.cache[require.resolve('../../' + filelocation)];

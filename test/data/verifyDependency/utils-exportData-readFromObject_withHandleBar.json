@@ -1,0 +1,27 @@
+{
+  "data": {
+    "name": "shopify-netsuite-fulfillment-export-adaptor ",
+    "asynchronous": true,
+    "type": "distributed",
+    "writeHere": [{
+      "temp": {}
+      ,"test" : true
+    }],
+    "distributed": {}
+  },
+  "resourcetype": "exports",
+  "jsonpath": [
+    {
+      "readfrom": {
+        "id": 1345678
+      },
+      "writeto": "_connectionId",
+      "writetopath": "$.writeHere[?(@.{{{pathHelper 'state.storeIdentifyAttr'}}}=={{{pathHelper 'state.storeIdentifyValue'}}})]"
+      ,"convertToString": true
+    }
+  ],
+  "responseBody": {
+    "_id": "1234567",
+    "_connectionId": "987654"
+  }
+}
