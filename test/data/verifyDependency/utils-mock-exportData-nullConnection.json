@@ -4,7 +4,7 @@
     "asynchronous": true,
     "type": "distributed",
     "distributed": {},
-    "_connectionId": "Undefined"
+    "_connectionId": null
   },
   "resourcetype": "exports",
   "jsonpath": [

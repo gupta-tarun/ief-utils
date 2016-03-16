@@ -265,10 +265,10 @@ describe('VerifyDependency Function', function() {
       done();
     })
   })
-  it('Should push Undefined if unable to find the readFrom value', function(done){
+  it('Should push null if unable to find the readFrom value', function(done){
     var stubstoload = [
       'verifyDependency/utils-mock-connection-withoutIdResponse.json',
-      'verifyDependency/utils-mock-exportData-undefinedConnection.json'
+      'verifyDependency/utils-mock-exportData-nullConnection.json'
     ]
     createStubResponses(stub, stubstoload)
     var records = require('./data/verifyDependency/utils-recordsMeta-noReadFrom.json');
@@ -278,8 +278,8 @@ describe('VerifyDependency Function', function() {
       if(error){
         logger.debug('Test failed : ' + JSON.stringify(error));
       }
-      assert.deepEqual(success['export-fulfillment'].info.data._connectionId, 'Undefined',
-        'should return _connectionId as Undefined')
+      assert.deepEqual(success['export-fulfillment'].info.data._connectionId, null,
+        'should return _connectionId as null')
       done();
     })
   })

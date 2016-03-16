@@ -236,7 +236,7 @@ if (process.env.NODE_ENV === 'staging') {
           logInSplunk('finding ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
           if (tempJsonPath.length <= 0) {
             logInSplunk('Unable to find ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
-            tempJsonPath.push('Undefined')
+            tempJsonPath.push(null)
           }
           //Bug# in case of object do not add as string
           if (!(typeof(tempJsonPath[0]) === 'object')) {
