@@ -12,11 +12,14 @@ mockery.enable({
     , warnOnUnregistered: false
     , useCleanCache: true
 });
-var HERCULES_BASE_URL = 'https://api.integrator.io';
-if (process.env.NODE_ENV !== 'production') {
+var HERCULES_BASE_URL = 'https://api.integrator.io'
+if (process.env.NODE_ENV === 'staging') {
+  HERCULES_BASE_URL = 'https://api.staging.integrator.io'
+} else if (process.env.NODE_ENV === 'development') {
+  //local testing of code
   HERCULES_BASE_URL = 'http://api.localhost.io:5000'
 }
-var utils = require('./utils.js')
+var utils = require('../utils.js')
 
 describe('utils.js integratorRestClient function unit test cases', function() {
   it('should throw no auth token error', function(done) {
@@ -231,7 +234,7 @@ describe('integratorApiIdentifierClient function unit test cases!', function() {
 })
 describe('createRecordsInOrder function unit test cases!', function() {
   it('loadJSON has been called once', function(done) {
-    var metaData = require('./testData/allrecordsmeta.json')
+    var metaData = require('../testData/allrecordsmeta.json')
     try {
     utils.createRecordsInOrder(metaData, { bearerToken : 'jshdkjsdh7567djd68b'}, function(error, success) {
 
@@ -241,7 +244,7 @@ describe('createRecordsInOrder function unit test cases!', function() {
     }
   })
   it('should return true since all dependencies are marked resolved', function(done) {
-    var metaData = require('./testData/allrecordsmeta.json')
+    var metaData = require('../testData/allrecordsmeta.json')
     _.each(metaData, function(record) {
       record.resolved = true,
       record.isLoaded = true
@@ -252,7 +255,7 @@ describe('createRecordsInOrder function unit test cases!', function() {
     })
   })
   it('should throw cyclic dependency error!', function(done) {
-    var circularJson = require('./testData/allRecordsMetaDataCircular.json')
+    var circularJson = require('../testData/allRecordsMetaDataCircular.json')
     utils.createRecordsInOrder(circularJson, null, function(error, succss) {
       if(error) {
         assert.equal(error.message, 'The recordsArray has cyclic refreneces')
@@ -261,7 +264,7 @@ describe('createRecordsInOrder function unit test cases!', function() {
     })
   })
   it('should throw no location error !', function(done) {
-    var noLocationJson = require('./testData/allRecordsMetaDataNoLocation.json')
+    var noLocationJson = require('../testData/allRecordsMetaDataNoLocation.json')
     utils.createRecordsInOrder(noLocationJson, null, function(error, success) {
       if(error) {
         var index = (error.message).search('Config Error: no filelocation given in record : ');
@@ -274,7 +277,7 @@ describe('createRecordsInOrder function unit test cases!', function() {
  describe('loadJSON function test cases!', function() {
   it('should throw MODULE_NOT_FOUND error', function(done) {
     try {
-      utils.loadJSON('./testData/allrecordsmeta.json')
+      utils.loadJSON('../testData/allrecordsmeta.json')
     } catch (e) {
     assert.equal(e.code, "MODULE_NOT_FOUND")
     done()
@@ -282,8 +285,8 @@ describe('createRecordsInOrder function unit test cases!', function() {
   })
   //TODO: need to do proper mocking for require statement
   it.skip('should not throw MODULE_NOT_FOUND error if already loaded', function(done) {
-    console.log(require.cache[require.resolve('./testData/allrecordsmeta.json')])
-    if(utils.loadJSON('./testData/allrecordsmeta.json') !== undefined)
+    console.log(require.cache[require.resolve('../testData/allrecordsmeta.json')])
+    if(utils.loadJSON('../testData/allrecordsmeta.json') !== undefined)
     done()
   })
 })
@@ -292,7 +295,7 @@ describe('makeAsyncCalls function unit test cases.', function(){
     var api = nock(HERCULES_BASE_URL)
           .post("/jhdjhs7dh67db6")
           .reply(402, "POST http method has been used.");
-    var metaData = require('./testData/allrecordsmeta.json')
+    var metaData = require('../testData/allrecordsmeta.json')
     _.each(metaData, function(record) {
       record.isLoaded = true,
       record.resolved = false,
@@ -317,7 +320,7 @@ describe('makeAsyncCalls function unit test cases.', function(){
     var api = nock(HERCULES_BASE_URL)
           .get("/v1/connections")
           .reply(402, "Hello World");
-   var metaData = require('./testData/allrecordsmeta.json')
+   var metaData = require('../testData/allrecordsmeta.json')
    _.each(metaData, function(record) {
      record.isLoaded = true,
      record.resolved = false,
@@ -334,27 +337,8 @@ describe('makeAsyncCalls function unit test cases.', function(){
       }
     })
   })
-  it('should get ** The method is set GET but there is no _id in data** error', function(done){
-    var metaData = require('./testData/allrecordsmeta.json')
-    _.each(metaData, function(record) {
-      record.isLoaded = true,
-      record.resolved = false,
-      record.info = { "apiIdentifier1" : false,
-                      "method" : "GET"},
-      record.info.data = { "bearerToken" : "jshdkjsdh7567djd68b"},
-      record.info.bearerToken = "jshdkjsdh7567djd68b"
-    })
-    utils.createRecordsInOrder(metaData, { bearerToken : 'jshdkjsdh7567djd68b'}, function(error, success) {
-      if(error) {
-        assert.equal(error.message, 'The method is set GET but there is no _id in data')
-        done()
-      } else {
-        console.log('no error!')
-      }
-    })
-  })
   it('should call makeAsyncCalls at the end.', function(done) {
-    var metaData = require('./testData/allRecordsMetaData.json')
+    var metaData = require('../testData/allRecordsMetaData.json')
     var api = nock(HERCULES_BASE_URL)
           .post("/v1/connections")
           .reply(201, "First Time POST");
@@ -384,7 +368,7 @@ describe('makeAsyncCalls function unit test cases.', function(){
     })
   })
     it('should use GET http method(as it provided inside info block) and delete data inside info', function(done) {
-      var metaData = require('./testData/allRecordsMetaDataSingleRecord.json')
+      var metaData = require('../testData/allRecordsMetaDataSingleRecord.json')
       var api = nock(HERCULES_BASE_URL)
             .get("/v1/connections/vjsdsd8sjdhj9sdj8")
             .reply(401, "GET http method has been used.")
