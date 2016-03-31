@@ -142,7 +142,7 @@ if (process.env.NODE_ENV === 'staging') {
   }
   /**
    *   signature :
-   *   options [{bearerToken, connectionId, method, scriptId, deployId, relativeURI}]
+   *   options [{bearerToken, connectionId, method, scriptId, deployId, data, relativeURI}]
    *   callback
    */
   , integratorProxyCall = function(options, callback) {
@@ -168,11 +168,13 @@ if (process.env.NODE_ENV === 'staging') {
       opts.headers['Integrator-Netsuite-ScriptId'] = options.scriptId
       opts.headers['Integrator-Netsuite-DeployId'] = options.deployId
       opts.headers['Integrator-Method'] = options.method
+      opts.json = options.data
     }
     // REST call
     else if(!!options.relativeURI && !!options.method){
       opts.headers['Integrator-Relative-URI'] = options.relativeURI
       opts.headers['Integrator-Method'] = options.method
+      opts.json = options.data
     }
     else{
       logInSplunk('Proxy request headers are not in correct format');
