@@ -46,12 +46,12 @@ if (process.env.NODE_ENV === 'staging') {
     //while every dependency is not resolved
     makeAsyncCalls(recordarray, callback);
   }
-  , /**
+  /**
    *   signature :
    *   options [{bearerToken, resourcetype, id, data}]
    *   callback
    */
-  integratorRestClient = function(options, callback) {
+  , integratorRestClient = function(options, callback) {
     if (!options.resourcetype) {
       logInSplunk('No resourcetype is given!');
       return callback(new Error('No resourcetype is given!'));
@@ -139,7 +139,62 @@ if (process.env.NODE_ENV === 'staging') {
       //this means success
       return callback(null, res, body);
     });
-  };
+  }
+  /**
+   *   signature :
+   *   options [{bearerToken, connectionId, method, scriptId, deployId, data, relativeURI}]
+   *   callback
+   */
+  , integratorProxyCall = function(options, callback) {
+    if (!options.bearerToken) {
+      logInSplunk('No Auth Token is given!');
+      return callback(new Error('No Auth Token is given!'));
+    }
+    if(!options.connectionId){
+      logInSplunk('Connection id is not given');
+      return callback(new Error('connection id is not given'));
+    }
+    var opts = {
+      uri: HERCULES_BASE_URL + '/v1/connections/' + options.connectionId + '/proxy'
+      , method: 'POST'
+      , headers: {
+        Authorization: 'Bearer ' + options.bearerToken
+        , 'Content-Type': 'application/json'
+      }
+      , json: true
+    };
+    //Netsuite Restlet call
+    if(!!options.scriptId && !!options.deployId && !!options.method){
+      opts.headers['Integrator-Netsuite-ScriptId'] = options.scriptId
+      opts.headers['Integrator-Netsuite-DeployId'] = options.deployId
+      opts.headers['Integrator-Method'] = options.method
+      if(!!options.data){
+        opts.json = options.data
+      }
+    }
+    // REST call
+    else if(!!options.relativeURI && !!options.method){
+      opts.headers['Integrator-Relative-URI'] = options.relativeURI
+      opts.headers['Integrator-Method'] = options.method
+      if(!!options.data){
+        opts.json = options.data
+      }
+    }
+    else{
+      logInSplunk('Proxy request headers are not in correct format');
+      return callback(new Error('Proxy request headers are not in correct format'));
+    }
+    request(opts, function(error, res, body) {
+      if (error) {
+        return callback(new Error('Error while connecting to Integrator.io'));
+      }
+      if (!verifyResponse(res)) {
+        return callback(new Error('Unable to verify response'));
+      }
+      //this means success
+      return callback(null, res, body);
+    })
+  }
 
   var verifyAndInjectDependency = function(recordarray, record) {
     logInSplunk('start verifyAndInjectDependency for ' + JSON.stringify(record));
@@ -487,5 +542,6 @@ if (process.env.NODE_ENV === 'staging') {
 exports.createRecordsInOrder = createRecordsInOrder
 exports.integratorRestClient = integratorRestClient
 exports.integratorApiIdentifierClient = integratorApiIdentifierClient
+exports.integratorProxyCall = integratorProxyCall
 exports.logInSplunk = logInSplunk
 exports.loadJSON = loadJSON

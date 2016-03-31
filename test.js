@@ -406,3 +406,31 @@ describe('makeAsyncCalls function unit test cases.', function(){
    })
  })
 })
+describe('utils.js integratorProxyCall function unit test cases', function() {
+  it('should throw no auth token error', function(done) {
+    utils.integratorProxyCall({
+      'bearerToken': ""
+      , 'connectionId': 1234
+      , 'method': 'GET'
+      , 'relativeURI': '/admin/orders/' + 234 + '/transactions'
+    }, function(err, response, body) {
+      if (err) {
+        assert.equal(err.message, 'No Auth Token is given!')
+        done()
+      }
+    })
+  })
+  it('should throw Proxy request headers are not in correct format error', function(done) {
+    utils.integratorProxyCall({
+      'bearerToken': "testToken"
+      , 'connectionId': "1234"
+      , 'method': 'GET'
+      , 'relativeURI': ''
+    }, function(err, response, body) {
+      if (err) {
+        assert.equal(err.message, 'Proxy request headers are not in correct format')
+        done()
+      }
+    })
+  })
+})
