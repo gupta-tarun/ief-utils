@@ -446,7 +446,6 @@ if (process.env.NODE_ENV === 'staging') {
         integratorProxyCall(record.info, function(err, response, body) {
           if (err)  return cb(err)
           record.info.response = body
-          console.log('proxy call made for ' + JSON.stringify(body));
           //mark as resolved
           record.resolved = true
           return cb(null)
