@@ -181,7 +181,7 @@ describe('VerifyDependency Function', function() {
     })
   })
 
-  it('Should return success for Proxy call', function (done) {
+  it('Should return success for Proxy call for multiple records', function (done) {
     var stubstoload = [
       'proxy/utils-mock-netsuite-proxy.json',
       'proxy/utils-mock-netsuite-proxy-2.json'
