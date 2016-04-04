@@ -1,0 +1,20 @@
+{
+    "data": {
+        "proxyData": {
+            "requestBody": [{
+                "type": "savedsearch",
+                "operation": "create",
+                "config": {
+                  "title" : "Yolo Search",
+                  "searchId" : "customsearch_yolo",
+                  "recordType" : "salesorder"
+                }
+            }],
+            "scriptId": "customscript605",
+            "deployId": "customdeploy2",
+            "method": "POST",
+            "connectionId": "56d3e8d3e24d0cf5090e5a17"
+        }
+    },
+    "proxyCall": true
+}

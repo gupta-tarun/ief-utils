@@ -6,7 +6,8 @@ var _ = require('lodash')
   , jsonPath = require('JSONPath')
   , request = require('request')
   , logger = require('winston')
-  , handlebars = require('handlebars');
+  , handlebars = require('handlebars')
+  , CONSTS = require('./constants.js');
   //logger.level = 'error'
 var HERCULES_BASE_URL = 'https://api.integrator.io';
 if (process.env.NODE_ENV === 'staging') {
@@ -15,6 +16,7 @@ if (process.env.NODE_ENV === 'staging') {
   //local testing of code
   HERCULES_BASE_URL = 'http://api.localhost.io:5000'
 }
+
 
   var createRecordsInOrder = function(recordarray, options, callback) {
     //the record should Directed Acyclic Graph
@@ -424,6 +426,31 @@ if (process.env.NODE_ENV === 'staging') {
           record.resolved = true;
           return cb(null);
         });
+      } else if (record.info.proxyCall) {
+        // For proxy calls
+
+        record.info.method = record.info.data.proxyData.method || null
+        record.info.deployId = record.info.data.proxyData.deployId || null
+        record.info.scriptId = record.info.data.proxyData.scriptId || null
+        record.info.relativeURI = record.info.data.proxyData.relativeURI || null
+        record.info.connectionId = record.info.data.proxyData.connectionId || null
+        record.info.data = {  requests :record.info.data.proxyData.requestBody } || null
+
+        if(!record.info.relativeURI){
+          if(!record.info.deployId)
+            record.info.deployId = CONSTS.NS_CONNECTOR_UTIL_DEPLOY_ID
+          if(!record.info.scriptId)
+            record.info.scriptId = CONSTS.NS_CONNECTOR_UTIL_SCRIPT_ID
+        }
+
+        integratorProxyCall(record.info, function(err, response, body) {
+          if (err)  return cb(err)
+          record.info.response = body
+          console.log('proxy call made for ' + JSON.stringify(body));
+          //mark as resolved
+          record.resolved = true
+          return cb(null)
+        })
       } else {
         //if the record.info.method === GET remove data node and use _id as id
         //BAD WAY TO DO IT
