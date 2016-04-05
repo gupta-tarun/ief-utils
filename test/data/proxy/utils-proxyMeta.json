@@ -1,0 +1,11 @@
+{
+  "savedsearch-netsuite": {
+    "dependson": [],
+    "filelocation": "./data/proxy/utils-netsuite-proxy.json"
+  },
+
+  "savedsearch-netsuite-2": {
+    "dependson": [],
+    "filelocation": "./data/proxy/utils-netsuite-proxy-2.json"
+  }
+}

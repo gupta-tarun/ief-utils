@@ -113,6 +113,35 @@ var createStubResponsesForApiIdentifiers = function(stub, allResponses) {
 
   });
 };
+var createStubResponsesForProxyCall = function(stub, allResponses) {
+  lodash.each(allResponses, function(responsefile) {
+    var response = require('./data/' + responsefile)
+
+    var opts = {
+      uri: HERCULES_BASE_URL + '/v1/connections/' + response.data.proxyData.connectionId + '/proxy'
+      , method: 'POST'
+      , headers: {
+        Authorization: 'Bearer TestToken'
+        , 'Content-Type': 'application/json'
+        , 'Integrator-Netsuite-ScriptId' : response.data.proxyData.scriptId || null
+        , 'Integrator-Netsuite-DeployId' : response.data.proxyData.deployId || null
+        , 'Integrator-Method' : response.data.proxyData.method || null
+      }
+      , json: true
+    };
+
+    if(!response.data.proxyData.deployId && !response.data.proxyData.scriptId)
+      opts.headers['Integrator-Relative-URI'] = response.data.proxyData.relativeURI
+    if (!!response.data.proxyData.requestBody) {
+      opts.json = { requests : response.data.proxyData.requestBody }
+    }
+    logger.info(JSON.stringify(opts) + ' resgistered!');
+    stub.withArgs(opts).yields(null, {
+      statusCode: 200
+    }, response.responseBody);
+  });
+};
+
 var initializeData = function(records, data){
   var temprecord;
   for (temprecord in records) {
@@ -148,6 +177,26 @@ describe('VerifyDependency Function', function() {
         logger.debug('Test failed : ' + JSON.stringify(error));
       }
       assert.equal(success['connection-netsuite'].resolved, true, 'should return resolved as true')
+      done();
+    })
+  })
+
+  it('Should return success for Proxy call for multiple records', function (done) {
+    var stubstoload = [
+      'proxy/utils-mock-netsuite-proxy.json',
+      'proxy/utils-mock-netsuite-proxy-2.json'
+    ]
+    createStubResponsesForProxyCall(stub, stubstoload)
+    var records = require('./data/proxy/utils-proxyMeta.json');
+    var data = {}
+    initializeData(records, data)
+
+    utils.createRecordsInOrder(records, data, function(error, success){
+      if(error){
+        logger.debug('Test failed : ' + JSON.stringify(error));
+      }
+      assert.equal(success['savedsearch-netsuite'].resolved, true, 'should return resolved as true')
+      assert.equal(success['savedsearch-netsuite-2'].resolved, true, 'should return resolved as true')
       done();
     })
   })
