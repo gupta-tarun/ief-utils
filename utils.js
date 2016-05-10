@@ -267,6 +267,7 @@ if (process.env.NODE_ENV === 'staging') {
       //iterate over this array and create tempvalue
       //tempReadValue
       var tempvalue = ""
+      , isReadFromIgnored
       _.each(temp.readfrom, function(n) {
           //if there is no record use value directly
           //TODO: Hack, if the readfrom is object be can't change that in string
@@ -288,6 +289,10 @@ if (process.env.NODE_ENV === 'staging') {
             return
           }
           //handles bars if exists any.
+          if (!recordarray[n.record]['info']['response'] && recordarray[n.record]['info']['ignoreError']) {
+            isReadFromIgnored = true
+            return
+          }
           n.readfrom = evalHandleBar(n.readfrom, recordarray)
           tempJsonPath = jsonPath.eval(recordarray[n.record]['info']['response'], n.readfrom)
           logInSplunk('finding ' + n.readfrom + ' in ' + JSON.stringify(recordarray[n.record]['info']['response']))
@@ -305,6 +310,9 @@ if (process.env.NODE_ENV === 'staging') {
         //set in record
         //TODO: Add support for nested value writes
         //if it doesn't start with $ mean no need to run JSONPath eval on writeto
+        if (isReadFromIgnored) {
+          continue
+        }
       var tempWriteto;
       if (temp.writetopath) {
         //adding support for dynamic write to path
