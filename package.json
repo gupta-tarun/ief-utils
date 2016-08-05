@@ -1,6 +1,6 @@
 {
   "name": "ief-utils",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Integrator Extension Framework Utilities",
   "main": "utils.js",
   "engines": {
@@ -25,7 +25,7 @@
     "lodash": "2.4.1",
     "async": "1.4.2",
     "JSONPath": "0.10.0",
-    "request": "2.38.0",
+    "request": "2.59.0",
     "winston": "2.2.0",
     "handlebars": "4.0.5"
   },
